@@ -1,3 +1,6 @@
+
+from __future__ import annotations
+
 from datetime import datetime
 
 from app.models.assignments import Assignment
@@ -79,3 +82,17 @@ class TicketService:
         if ticket is None:
             raise ValueError(f"Ticket {ticket_id} was not found")
         return ticket
+
+        # ---------- Consultas de Semana 9 ----------
+    def list_by_technician(self, technician_id: int) -> list[Ticket]:
+        """¿Qué tickets tiene asignados este técnico?"""
+        return [t for t in self._tickets if t.assignee_id == technician_id]
+
+    def list_by_category(self, category: str) -> list[Ticket]:
+        """¿Qué tickets pertenecen a esta categoría?"""
+        return [t for t in self._tickets if t.category == category]
+
+    def list_by_status(self, status: str | TicketStatus) -> list[Ticket]:
+        """¿Qué tickets siguen abiertos, en proceso, etc.?"""
+        estado_normalizado = TicketStatus(status) if not isinstance(status, TicketStatus) else status
+        return [t for t in self._tickets if t.status == estado_normalizado]
