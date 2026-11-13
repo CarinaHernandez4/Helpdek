@@ -38,6 +38,12 @@ export function isTicketOpen(ticket) {
   return Boolean(ticket) && !["closed", "cancelled"].includes(ticket.status);
 }
 
+//  Modulo "Registro de tiempo de atencion": solo open/in_progress admite registros nuevos
+// (igual que LOGGABLE_STATUSES en app/services/tickets.py; resolved YA NO admite, a diferencia de isTicketOpen).
+export function isLoggable(ticket) {
+  return Boolean(ticket) && ["open", "in_progress"].includes(ticket.status);
+}
+
 // 22/10/2026 - Cancelar es SOLO del solicitante que abrio el ticket (TicketService.cancel), y solo mientras
 // el flujo lo permita: desde abierto o en progreso. Un tecnico cancela cambiando el estado, no con este boton.
 export function canCancel(user, ticket) {

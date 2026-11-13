@@ -91,10 +91,26 @@ CREATE TABLE articles (
   FOREIGN KEY(author_id) REFERENCES users (id)
 );
 
+-- 09/11/2026 - Modulo "Registro de tiempo de atencion" (propuesta en docs/Propuesta Modulo Nuevo.pdf).
+-- Un ticket acumula muchos work_logs; cada uno pertenece al miembro del staff que registro los minutos.
+CREATE TABLE work_logs (
+  id SERIAL NOT NULL,
+  ticket_id INTEGER NOT NULL,
+  author_id INTEGER NOT NULL,
+  minutes INTEGER NOT NULL
+    CHECK (minutes >= 1 AND minutes <= 1440),
+  note TEXT NOT NULL,
+  created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  FOREIGN KEY(ticket_id) REFERENCES tickets (id) ON DELETE CASCADE,
+  FOREIGN KEY(author_id) REFERENCES users (id)
+);
+
 CREATE INDEX idx_tickets_status ON tickets(status);
 CREATE INDEX idx_tickets_assignee ON tickets(assignee_id);
 CREATE INDEX idx_comments_ticket ON comments(ticket_id);
 CREATE INDEX idx_history_ticket ON history(ticket_id);
 -- Indice parcial: solo indexa lo que la bandeja consulta (no leidas).
 CREATE INDEX idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL;
+CREATE INDEX idx_work_logs_ticket ON work_logs(ticket_id);
 

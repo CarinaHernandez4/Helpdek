@@ -29,10 +29,16 @@ from app.models.assignments import Assignment
 from app.models.comments import Comment
 from app.models.entities import HistoryEvent, Ticket, User
 from app.models.enums import CATEGORIES, PRIORITIES, Role, TicketStatus
-from app.repositories.base import TicketPage, TicketQuery, TicketRepository
+from app.models.work_logs import WorkLog
+from app.repositories.base import TicketPage, TicketQuery, TicketRepository, WorkLogRepository, WorkLogSummary
 from app.services.events import EventPublisher, TicketEventSubscriber
 from app.services.notifications import Notifier, NotifierSubscriber, NullNotifier
 from app.services.users import UserService
+
+#  Estados en los que se puede registrar tiempo de atencion.
+LOGGABLE_STATUSES = (TicketStatus.OPEN, TicketStatus.IN_PROGRESS)
+MIN_WORK_LOG_MINUTES = 1
+MAX_WORK_LOG_MINUTES = 1440
 
 
 class TicketService:
@@ -48,9 +54,12 @@ class TicketService:
         users: UserService,
         notifier: Notifier | None = None,
         subscribers: Iterable[TicketEventSubscriber] = (),
+        work_logs: WorkLogRepository | None = None,
     ) -> None:
         self._repository = repository
         self._users = users
+        # Opcional por compatibilidad. 
+        self._work_logs = work_logs
         self._events = EventPublisher()
         # 22/10/2026 - Compatibilidad: el parametro `notifier` de las semanas 7-13
         # sigue funcionando; ahora solo se envuelve como un suscriptor mas.
@@ -374,6 +383,72 @@ class TicketService:
             )
         )
         return ticket
+
+    # --- registro de tiempo de atencion (work logs) ---------------------------------
+
+    def add_work_log(
+        self,
+        ticket_id: int,
+        actor: User,
+        minutes: int,
+        note: str,
+    ) -> WorkLog:
+        """Registra cuanto tiempo dedico `actor` a un ticket abierto o en progreso.
+
+        Orden de validacion (igual que la propuesta): el actor es personal; el
+        ticket existe; el ticket esta open/in_progress; los minutos son validos;
+        la nota no esta vacia.
+        """
+        if not actor.is_staff:
+            raise PermissionDeniedError(
+                "Only staff users can log time on a ticket",
+                actor_id=actor.id,
+                ticket_id=ticket_id,
+            )
+        ticket = self.require(ticket_id)
+        if ticket.status not in LOGGABLE_STATUSES:
+            raise ValidationError(
+                "time can only be logged while the ticket is open or in progress",
+                field="ticket_id",
+                ticket_id=ticket_id,
+                status=ticket.status.value,
+            )
+        if not (MIN_WORK_LOG_MINUTES <= minutes <= MAX_WORK_LOG_MINUTES):
+            raise ValidationError(
+                f"minutes must be between {MIN_WORK_LOG_MINUTES} and {MAX_WORK_LOG_MINUTES}",
+                field="minutes",
+            )
+        trimmed_note = (note or "").strip()
+        if not trimmed_note:
+            raise ValidationError("note is required", field="note")
+
+        work_log = WorkLog(
+            ticket_id=ticket_id,
+            author_id=actor.id,
+            minutes=minutes,
+            note=trimmed_note,
+        )
+        return self._require_work_logs().add(work_log)
+
+    def work_logs_for(self, ticket_id: int, actor: User) -> WorkLogSummary:
+        """Los registros de tiempo de un ticket y su total acumulado, solo para personal."""
+        if not actor.is_staff:
+            raise PermissionDeniedError(
+                "Only staff users can view time logged on a ticket",
+                actor_id=actor.id,
+                ticket_id=ticket_id,
+            )
+        self.require(ticket_id)
+        items = self._require_work_logs().list_for_ticket(ticket_id)
+        return WorkLogSummary(items=items, total_minutes=sum(item.minutes for item in items))
+
+    def _require_work_logs(self) -> WorkLogRepository:
+        if self._work_logs is None:
+            raise RuntimeError(
+                "TicketService was built without a WorkLogRepository; "
+                "pass work_logs= to use add_work_log/work_logs_for"
+            )
+        return self._work_logs
 
     def _record_history(
         self,

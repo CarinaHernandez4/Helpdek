@@ -103,11 +103,38 @@ class UserRepository(ABC):
     @abstractmethod
     def all(self) -> list[User]: ...
 
-    # 22/10/2026 - El hash vive en el repositorio y NO en el dataclass User: asi
-    # ninguna respuesta de la API puede devolverlo por accidente.
+    # El hash vive en el repositorio y NO en el dataclass User: asi
+    
     @abstractmethod
     def password_hash_for(self, email: str) -> str | None:
         """Hash guardado del usuario (None si el correo no existe)."""
 
     @abstractmethod
     def set_password_hash(self, user_id: int, password_hash: str) -> None: ...
+
+
+
+
+
+@dataclass(frozen=True)
+class WorkLogSummary:
+    """09/11/2026 - Los registros de tiempo de un ticket y su total acumulado (minutos)."""
+
+    items: list[WorkLog] = field(default_factory=list)
+    total_minutes: int = 0
+
+
+class WorkLogRepository(ABC):
+    """09/11/2026 - Contrato del modulo "Registro de tiempo de atencion" (work logs).
+
+    No vive dentro del agregado Ticket (como comments/history): es una seccion
+    aparte que solo ve el staff, asi que el servicio la consulta bajo demanda.
+    """
+
+    @abstractmethod
+    def add(self, work_log: WorkLog) -> WorkLog:
+        """Guarda el registro nuevo y le asigna id (en PostgreSQL lo asigna la base)."""
+
+    @abstractmethod
+    def list_for_ticket(self, ticket_id: int) -> list[WorkLog]:
+        """Registros de un ticket, del mas antiguo al mas reciente."""

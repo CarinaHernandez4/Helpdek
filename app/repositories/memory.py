@@ -1,13 +1,4 @@
-"""22/10/2026 - Repositorios en memoria: el doble de pruebas que imita a PostgreSQL.
 
-Los uso para probar reglas de negocio rapido y sin base de datos. Respetan el
-mismo contrato que los repositorios SQLAlchemy, incluidos los ids asignados por
-el almacenamiento (un contador por tabla, como un SERIAL).
-"""
-
-# 22/10/2026 - Agrego esta linea para que el proyecto funcione en Python 3.11 a 3.13:
-# la clase define un metodo llamado `list` y, sin ella, la anotacion `list[...]`
-# se evaluaria contra ese metodo y no contra el tipo nativo (TypeError al importar).
 from __future__ import annotations
 
 from dataclasses import replace
@@ -15,7 +6,14 @@ from dataclasses import replace
 from app.domain.clock import now
 from app.models.entities import Ticket, User
 from app.models.enums import TicketStatus
-from app.repositories.base import TicketPage, TicketQuery, TicketRepository, UserRepository
+from app.models.work_logs import WorkLog
+from app.repositories.base import (
+    TicketPage,
+    TicketQuery,
+    TicketRepository,
+    UserRepository,
+    WorkLogRepository,
+)
 from app.services.notifications import Notification, NotificationRepository
 
 
@@ -173,3 +171,20 @@ class InMemoryNotificationRepository(NotificationRepository):
                 self._items[index] = replace(item, read_at=now())
                 updated += 1
         return updated
+
+
+class InMemoryWorkLogRepository(WorkLogRepository):
+    """09/11/2026 - Registros de tiempo en una lista, con su propio contador de ids."""
+
+    def __init__(self) -> None:
+        self._items: list[WorkLog] = []
+        self._next_id = 1
+
+    def add(self, work_log: WorkLog) -> WorkLog:
+        work_log.id = self._next_id
+        self._next_id += 1
+        self._items.append(work_log)
+        return work_log
+
+    def list_for_ticket(self, ticket_id: int) -> list[WorkLog]:
+        return [item for item in self._items if item.ticket_id == ticket_id]

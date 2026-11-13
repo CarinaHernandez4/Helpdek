@@ -18,7 +18,7 @@ import {
   label,
 } from "../format.js";
 import { bootPage } from "../layout.js";
-import { allowedTransitions, canCancel, isAssignable, isStaff, isTicketOpen } from "../rules.js";
+import { allowedTransitions, canCancel, isAssignable, isLoggable, isStaff, isTicketOpen } from "../rules.js";
 import {
   badge,
   clearAlert,
@@ -31,7 +31,7 @@ import {
   showFieldErrors,
   toast,
 } from "../ui.js";
-import { PRIORITIES, validateComment } from "../validation.js";
+import { PRIORITIES, validateComment, validateWorkLog } from "../validation.js";
 
 const view = document.getElementById("ticket-view");
 const alertRegion = document.getElementById("alert-region");
@@ -244,6 +244,72 @@ function commentForm(ticket) {
   return form;
 }
 
+// 09/11/2026 - Modulo "Registro de tiempo de atencion" (docs/Propuesta Modulo Nuevo.pdf): seccion solo
+// para personal (isStaff). No llega con GET /tickets/{id}; `summary` se carga aparte (ver loadTicket).
+function renderWorkLogs(ticket, summary) {
+  const items = summary.items.map((workLog) =>
+    el(
+      "li",
+      { className: "comment" },
+      el("div", {
+        className: "small text-body-secondary",
+        text: `${personName(workLog.author_id)} · ${workLog.minutes} min · ${formatDateTime(workLog.created_at)}`,
+      }),
+      el("p", { className: "pre-wrap mb-0", text: workLog.note }),
+    ),
+  );
+  const list =
+    items.length === 0
+      ? el("p", { className: "text-body-secondary", text: "Aún no hay tiempo registrado." })
+      : el("ul", { className: "list-unstyled comment-list" }, ...items);
+  return card(
+    "work-logs-title",
+    "Tiempo de atención",
+    list,
+    el("p", { className: "fw-semibold", text: `Total acumulado: ${summary.total_minutes} min` }),
+    isLoggable(ticket) ? workLogForm(ticket) : null,
+  );
+}
+
+function workLogForm(ticket) {
+  const minutesInput = el("input", {
+    className: "form-control",
+    attrs: { id: "work-log-minutes", name: "minutes", type: "number", min: "1", max: "1440", required: true },
+  });
+  const noteInput = el("textarea", {
+    className: "form-control",
+    attrs: { id: "work-log-note", name: "note", rows: "2", required: true },
+  });
+  const button = el("button", { className: "btn btn-primary", text: "Registrar tiempo", attrs: { type: "submit" } });
+  const form = el(
+    "form",
+    { attrs: { novalidate: true }, className: "mt-3" },
+    el("label", { className: "form-label", text: "Minutos", attrs: { for: "work-log-minutes" } }),
+    minutesInput,
+    el("label", { className: "form-label mt-2", text: "Nota", attrs: { for: "work-log-note" } }),
+    noteInput,
+    el("div", { className: "mt-2" }, button),
+  );
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    clearAlert(alertRegion);
+    clearFieldErrors(form);
+    const errors = validateWorkLog({ minutes: minutesInput.value, note: noteInput.value });
+    if (Object.keys(errors).length > 0) {
+      showFieldErrors(form, errors);
+      return;
+    }
+    await runAction(
+      button,
+      "Registrando…",
+      () => api.addWorkLog(ticket.id, Number(minutesInput.value), noteInput.value.trim()),
+      "Tiempo registrado.",
+      { form, focusId: "work-logs-title" },
+    );
+  });
+  return form;
+}
+
 // 22/10/2026 - Historial: quien hizo que y cuando, del mas antiguo al mas reciente (el orden en que llega de la API).
 function renderHistory(ticket) {
   const items = ticket.history.map((event) => {
@@ -262,12 +328,13 @@ function renderHistory(ticket) {
   );
 }
 
-function renderTicket(ticket) {
+function renderTicket(ticket, workLogSummary) {
   pageTitle.textContent = `Ticket #${ticket.id}`;
   document.title = `Ticket #${ticket.id} · HelpDesk EDU`;
   view.replaceChildren(
     el("div", { className: "row g-3" }, el("div", { className: "col-lg-8" }, renderSummary(ticket)), el("div", { className: "col-lg-4" }, renderActions(ticket))),
     el("div", { className: "row g-3" }, el("div", { className: "col-lg-8" }, renderComments(ticket)), el("div", { className: "col-lg-4" }, renderHistory(ticket))),
+    workLogSummary ? el("div", { className: "row g-3" }, el("div", { className: "col-lg-8" }, renderWorkLogs(ticket, workLogSummary))) : null,
   );
 }
 
@@ -278,7 +345,10 @@ function renderTicket(ticket) {
 async function loadTicket(focusId = null) {
   view.replaceChildren(loadingIndicator("Cargando ticket…"));
   try {
-    renderTicket(await api.getTicket(ticketId));
+    const ticket = await api.getTicket(ticketId);
+    // 09/11/2026 - Tiempo de atencion: solo personal (la API responde 403 a un solicitante).
+    const workLogSummary = isStaff(user) ? await api.getWorkLogs(ticketId) : null;
+    renderTicket(ticket, workLogSummary);
     (document.getElementById(focusId ?? "") ?? document.getElementById("page-title")).focus();
   } catch (error) {
     view.replaceChildren();

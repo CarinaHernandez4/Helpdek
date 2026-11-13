@@ -43,6 +43,22 @@ export function validateComment(body) {
   return String(body ?? "").trim() === "" ? { body: "Escribe un comentario antes de enviarlo." } : {};
 }
 
+// Modulo "Registro de tiempo de atencion": minutos entre 1 y 1440 (un dia) y nota obligatoria.
+export const WORK_LOG_MIN_MINUTES = 1;
+export const WORK_LOG_MAX_MINUTES = 1440;
+
+export function validateWorkLog({ minutes, note }) {
+  const errors = {};
+  const parsedMinutes = Number(minutes);
+  if (!Number.isInteger(parsedMinutes) || parsedMinutes < WORK_LOG_MIN_MINUTES || parsedMinutes > WORK_LOG_MAX_MINUTES) {
+    errors.minutes = `Los minutos deben ser un número entero entre ${WORK_LOG_MIN_MINUTES} y ${WORK_LOG_MAX_MINUTES}.`;
+  }
+  if (String(note ?? "").trim() === "") {
+    errors.note = "Describe qué hiciste en esos minutos.";
+  }
+  return errors;
+}
+
 // 22/10/2026 - Ingreso: la API solo exige que ambos campos tengan texto (el largo maximo lo marca el formulario).
 export function validateLogin({ email, password }) {
   const errors = {};

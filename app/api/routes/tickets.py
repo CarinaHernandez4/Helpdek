@@ -114,3 +114,21 @@ def change_priority(ticket_id: int, body: PriorityChange, facade: FacadeDep, use
 @router.post("/{ticket_id}/cancel", response_model=TicketOut)
 def cancel_ticket(ticket_id: int, facade: FacadeDep, user: CurrentUser):
     return facade.cancel(user, ticket_id)
+
+
+# --- tiempo de atencion (work logs) ------------------------------------------
+
+@router.get("/{ticket_id}/work-logs", response_model=WorkLogListOut)
+def list_work_logs(ticket_id: int, facade: FacadeDep, user: CurrentUser):
+    summary = facade.work_logs_for(user, ticket_id)
+    return WorkLogListOut(items=summary.items, total_minutes=summary.total_minutes)
+
+
+@router.post(
+    "/{ticket_id}/work-logs",
+    response_model=WorkLogOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_work_log(ticket_id: int, body: WorkLogCreate, facade: FacadeDep, user: CurrentUser):
+    return facade.log_work(user, ticket_id, body.minutes, body.note)
+

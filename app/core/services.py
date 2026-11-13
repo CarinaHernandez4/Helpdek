@@ -1,10 +1,3 @@
-"""22/10/2026 - Arma los servicios sobre UNA sola sesion (semanas 13 y 15).
-
-Es el unico lugar donde conecto servicios con repositorios SQLAlchemy y donde
-decido quien escucha los eventos de un ticket; si manana cambia la persistencia
-o hay un suscriptor nuevo, cambia esta funcion y no las reglas de negocio.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -15,6 +8,7 @@ from app.repositories.sqlalchemy import (
     SqlAlchemyNotificationRepository,
     SqlAlchemyTicketRepository,
     SqlAlchemyUserRepository,
+    SqlAlchemyWorkLogRepository,
 )
 from app.services.audit import AuditLogSubscriber
 from app.services.events import TicketEventSubscriber
@@ -39,6 +33,10 @@ def build_services(
     if subscribers is None:
         subscribers = [AuditLogSubscriber()]
     tickets = TicketService(
-        SqlAlchemyTicketRepository(session), users, notifier=notifier, subscribers=subscribers
+        SqlAlchemyTicketRepository(session),
+        users,
+        notifier=notifier,
+        subscribers=subscribers,
+        work_logs=SqlAlchemyWorkLogRepository(session),
     )
     return users, tickets

@@ -33,6 +33,8 @@ const KNOWN_MESSAGES = {
   "ticket is closed or cancelled": "El ticket está cerrado o cancelado y ya no admite cambios.",
   "assignee must be support staff": "Solo se puede asignar a personal de soporte (técnico o supervisor).",
   "comment body is required": "Escribe un comentario antes de enviarlo.",
+  "time can only be logged while the ticket is open or in progress": "Solo se puede registrar tiempo mientras el ticket está abierto o en progreso.",
+  "note is required": "Escribe qué hiciste en esos minutos antes de registrar el tiempo.",
   "invalid email or password": "Correo o contraseña incorrectos.",
   "invalid or expired token": "Tu sesión venció. Ingresa de nuevo.",
   "bearer token required": "Tu sesión no es válida. Ingresa de nuevo.",
@@ -196,6 +198,12 @@ export const api = {
   },
   async addComment(id, body) {
     return (await request("POST", `/tickets/${id}/comments`, { body: { body } })).data;
+  },
+  async getWorkLogs(id) {
+    return (await request("GET", `/tickets/${id}/work-logs`)).data;
+  },
+  async addWorkLog(id, minutes, note) {
+    return (await request("POST", `/tickets/${id}/work-logs`, { body: { minutes, note } })).data;
   },
   async assign(id, technicianId) {
     return (await request("POST", `/tickets/${id}/assign`, { body: { technician_id: technicianId } })).data;

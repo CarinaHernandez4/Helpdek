@@ -24,7 +24,8 @@ from app.domain.errors import AuthenticationError
 from app.models.comments import Comment
 from app.models.entities import Ticket, User
 from app.models.enums import Role, TicketStatus
-from app.repositories.base import TicketPage
+from app.models.work_logs import WorkLog
+from app.repositories.base import TicketPage, WorkLogSummary
 from app.services.auth import AuthService
 from app.services.notifications import Notification, NotificationService
 from app.services.tickets import TicketService
@@ -123,6 +124,16 @@ class HelpDeskFacade:
 
     def cancel(self, actor: User, ticket_id: int) -> Ticket:
         return self._tickets.cancel(ticket_id, actor=actor)
+
+    # --- tiempo de atencion (work logs) ----------------------------------------------
+
+    def log_work(self, actor: User, ticket_id: int, minutes: int, note: str) -> WorkLog:
+        """ Registra el tiempo que `actor` dedico al ticket (solo personal)."""
+        return self._tickets.add_work_log(ticket_id, actor, minutes, note)
+
+    def work_logs_for(self, actor: User, ticket_id: int) -> WorkLogSummary:
+        """ Los registros de tiempo de un ticket y su total (solo personal)."""
+        return self._tickets.work_logs_for(ticket_id, actor)
 
     # --- avisos ---------------------------------------------------------------------
 

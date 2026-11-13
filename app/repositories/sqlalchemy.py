@@ -26,7 +26,14 @@ from app.domain.errors import ConflictError
 from app.models.comments import Comment
 from app.models.entities import HistoryEvent, Ticket, User
 from app.models.enums import Role, TicketStatus
-from app.repositories.base import TicketPage, TicketQuery, TicketRepository, UserRepository
+from app.models.work_logs import WorkLog
+from app.repositories.base import (
+    TicketPage,
+    TicketQuery,
+    TicketRepository,
+    UserRepository,
+    WorkLogRepository,
+)
 from app.services.notifications import Notification, NotificationRepository
 
 
@@ -101,6 +108,19 @@ class HistoryEventORM(Base):
     created_at: Mapped[datetime]
 
     ticket: Mapped["TicketORM"] = relationship(back_populates="history")
+
+
+# Modulo "Registro de tiempo de atencion"
+
+class WorkLogORM(Base):
+    __tablename__ = "work_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"))
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    minutes: Mapped[int]
+    note: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime]
 
 
 class NotificationORM(Base):
@@ -422,6 +442,44 @@ class SqlAlchemyNotificationRepository(NotificationRepository):
             .values(read_at=now())
         )
         return result.rowcount
+
+
+class SqlAlchemyWorkLogRepository(WorkLogRepository):
+    """09/11/2026 - Registros de tiempo guardados en la tabla `work_logs`, en la sesion que se le entregue."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, work_log: WorkLog) -> WorkLog:
+        row = WorkLogORM(
+            ticket_id=work_log.ticket_id,
+            author_id=work_log.author_id,
+            minutes=work_log.minutes,
+            note=work_log.note,
+            created_at=work_log.created_at,
+        )
+        _insert(self._session, row)
+        work_log.id = row.id
+        return work_log
+
+    def list_for_ticket(self, ticket_id: int) -> list[WorkLog]:
+        query = (
+            select(WorkLogORM)
+            .where(WorkLogORM.ticket_id == ticket_id)
+            .order_by(WorkLogORM.created_at, WorkLogORM.id)
+        )
+        return [_work_log_to_domain(row) for row in self._session.scalars(query)]
+
+
+def _work_log_to_domain(row: WorkLogORM) -> WorkLog:
+    return WorkLog(
+        id=row.id,
+        ticket_id=row.ticket_id,
+        author_id=row.author_id,
+        minutes=row.minutes,
+        note=row.note,
+        created_at=row.created_at,
+    )
 
 
 def _notification_to_domain(row: NotificationORM) -> Notification:

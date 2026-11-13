@@ -1,15 +1,3 @@
--- DATOS SEMILLA PARA PRACTICAR CONSULTAS (semana 10-11)
--- Requiere database.sql y functions_triggers.sql cargados.
---
--- Reglas de este archivo:
--- 1. No se insertan ids: SERIAL los asigna (1, 2, 3...) en el orden de los
---    INSERT y la secuencia queda sincronizada. Con ids explicitos, el
---    siguiente INSERT sin id falla con "duplicate key value violates unique
---    constraint users_pkey".
--- 2. No se inserta due_at: lo calcula el trigger de SLA segun la prioridad.
--- 3. Las fechas son relativas a CURRENT_TIMESTAMP para que el dashboard muestre
---    tickets vencidos y al dia sin importar la fecha de la clase.
--- 4. status, event_type y detail usan el mismo vocabulario que TicketService.
 
 -- users: ids 1..6
 INSERT INTO users (email, name, role, password_hash) VALUES
@@ -62,6 +50,12 @@ INSERT INTO notifications (user_id, ticket_id, title, message, type, read_at, cr
 (4, 3, 'Cambio de estado',   'Ticket #3 changed to closed',          'ticket_status_changed', CURRENT_TIMESTAMP - INTERVAL '8 days',       CURRENT_TIMESTAMP - INTERVAL '9 days'),
 (5, 5, 'Cambio de estado',   'Ticket #5 changed to resolved',        'ticket_status_changed', NULL,                                        CURRENT_TIMESTAMP - INTERVAL '3 days'),
 (6, 6, 'Ticket asignado',    'Ticket #6 was assigned to Carlos Perez', 'ticket_assigned',     CURRENT_TIMESTAMP - INTERVAL '2 days',       CURRENT_TIMESTAMP - INTERVAL '3 days');
+
+-- work_logs: tiempo que el staff registro en tickets que siguen open/in_progress (ticket 2 y 6).
+INSERT INTO work_logs (ticket_id, author_id, minutes, note, created_at) VALUES
+(2, 3, 30, 'Revision inicial del servidor de autenticacion', CURRENT_TIMESTAMP - INTERVAL '85 minutes'),
+(2, 3, 20, 'Reinicio del servicio de autenticacion y prueba de acceso', CURRENT_TIMESTAMP - INTERVAL '55 minutes'),
+(6, 6, 45, 'Verificacion de la licencia y reinstalacion de Office', CURRENT_TIMESTAMP - INTERVAL '2 days');
 
 -- articles: embedding = [red, acceso, hardware, software]
 INSERT INTO articles (title, body, category, author_id, embedding) VALUES
